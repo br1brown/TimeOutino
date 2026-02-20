@@ -1,21 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Media;
 using System.Speech.Synthesis;
-using System.Text;
-using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace TimeOutino
 {
-
     public enum TipoNotifica
     {
-        //[Description("Link Youtube")]
-        //YT,
         [Description("Notifiche di Windows")]
         Generica,
         [Description("Frase Random")]
@@ -24,16 +17,16 @@ namespace TimeOutino
         AudioLocale
     }
 
-    abstract public class Notifica
+    public abstract class Notifica : IDisposable
     {
-        public TipoRestart TipoRestart;
-        public TipoNotifica Tipo;
-        public bool Attiva;
+        public TipoRestart TipoRestart { get; set; }
+        public TipoNotifica Tipo { get; protected set; }
+        public bool Attiva { get; protected set; }
 
-        abstract public void start();
-        abstract public void stop();
+        public abstract void start();
+        public abstract void stop();
 
-        public void Toogle()
+        public void Toggle()
         {
             if (Attiva)
                 stop();
@@ -41,8 +34,11 @@ namespace TimeOutino
                 start();
         }
 
-    }
 
+        public virtual void Dispose()
+        {
+        }
+    }
 
     public class NotificaFrase : Notifica
     {
@@ -74,75 +70,111 @@ namespace TimeOutino
 
         public string[] DataSet { get; set; }
 
-        SpeechSynthesizer Parlante = new SpeechSynthesizer();
+        private readonly SpeechSynthesizer parlante = new SpeechSynthesizer();
+        private readonly Random random = new Random();
+
         public NotificaFrase()
         {
             Tipo = TipoNotifica.Frase;
+            DataSet = Array.Empty<string>();
         }
 
         public override void start()
         {
             Attiva = true;
-            Random random = new Random();
-            string dadire;
-            if (DataSet.Length > 0)
-            {
-                int start2 = random.Next(0, DataSet.Length);
-                dadire = DataSet[start2];
-            }
-            else
-            {
-                int start2 = random.Next(0, InitDataSet.Length);
-                dadire = InitDataSet[start2];
-            }
-            Parlante.SpeakAsync(dadire);
+            string[] source = DataSet != null && DataSet.Length > 0 ? DataSet : InitDataSet;
+            string daDire = source[random.Next(0, source.Length)];
+            parlante.SpeakAsync(daDire);
         }
 
         public override void stop()
         {
             Attiva = false;
-            Parlante.SpeakAsyncCancelAll();
+            parlante.SpeakAsyncCancelAll();
+        }
+
+        public override void Dispose()
+        {
+            parlante.Dispose();
         }
     }
-
 
     public class NotificaAudioLocale : Notifica
     {
-        WMPLib.WindowsMediaPlayer NotificaCustom = null;
-        public NotificaAudioLocale(string PathFile)
+        private WMPLib.WindowsMediaPlayer notificaCustom;
+
+        public NotificaAudioLocale(string pathFile)
         {
             Tipo = TipoNotifica.AudioLocale;
 
-            if (!File.Exists(PathFile))
-                throw new Exception("File non trovato!");
+            if (string.IsNullOrWhiteSpace(pathFile))
+                throw new ArgumentException("Seleziona un file audio locale.", nameof(pathFile));
 
-            NotificaCustom = new WMPLib.WindowsMediaPlayer();
-            NotificaCustom.URL = PathFile;
-            NotificaCustom.controls.stop(); //parte da solo ok ??
+            if (!File.Exists(pathFile))
+                throw new FileNotFoundException("File audio non trovato.", pathFile);
+
+            notificaCustom = new WMPLib.WindowsMediaPlayer();
+            notificaCustom.URL = pathFile;
+            notificaCustom.controls.stop();
         }
 
         public override void start()
         {
             Attiva = true;
-            if (NotificaCustom != null)
+            if (notificaCustom != null)
             {
-                NotificaCustom.settings.setMode("loop", true);
-                NotificaCustom.controls.play();
+                notificaCustom.settings.setMode("loop", true);
+                notificaCustom.controls.play();
             }
         }
 
         public override void stop()
         {
             Attiva = false;
-            if (NotificaCustom != null) NotificaCustom.controls.stop();
+            if (notificaCustom != null)
+                notificaCustom.controls.stop();
+        }
+
+        public override void Dispose()
+        {
+            if (notificaCustom != null)
+            {
+                notificaCustom.controls.stop();
+                notificaCustom.close();
+                notificaCustom = null;
+            }
         }
     }
 
-    public class NotificaGenerica : NotificaAudioLocale
+    public class NotificaGenerica : Notifica
     {
-        public NotificaGenerica(): base(@"C:\Windows\Media\Alarm01.wav")
+        private readonly Timer beepTimer;
+
+        public NotificaGenerica()
         {
             Tipo = TipoNotifica.Generica;
+            beepTimer = new Timer();
+            beepTimer.Interval = 3000;
+            beepTimer.Tick += (s, e) => SystemSounds.Exclamation.Play();
+        }
+
+        public override void start()
+        {
+            Attiva = true;
+            SystemSounds.Exclamation.Play();
+            beepTimer.Start();
+        }
+
+        public override void stop()
+        {
+            Attiva = false;
+            beepTimer.Stop();
+        }
+
+        public override void Dispose()
+        {
+            beepTimer.Stop();
+            beepTimer.Dispose();
         }
     }
 }

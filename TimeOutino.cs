@@ -1,7 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Media;
-using System.Speech.Synthesis;
 using System.Windows.Forms;
 
 namespace TimeOutino
@@ -16,10 +14,18 @@ namespace TimeOutino
         {
             customtimer = new CustomTimer();
             customtimer.InTimeEvent = OnTimeEvent;
-            restartcomb.DataSource = UtilsEnums.TipoRestart_sz;
-            notifiycomb.DataSource = UtilsEnums.TipoNotifica_sz;
+
+            restartcomb.DataSource = UtilsEnums.TipoRestartOptions;
+            restartcomb.DisplayMember = "Display";
+            restartcomb.ValueMember = "Value";
+
+            notifiycomb.DataSource = UtilsEnums.TipoNotificaOptions;
+            notifiycomb.DisplayMember = "Display";
+            notifiycomb.ValueMember = "Value";
 
             txtFrasi.Text = string.Join("\r\n", NotificaFrase.InitDataSet);
+
+            CambiaTipoNotifica(null, EventArgs.Empty);
         }
 
         private void RefreshDisplay()
@@ -97,8 +103,10 @@ namespace TimeOutino
 
         private void CambiaTipoNotifica(object sender, EventArgs e)
         {
-            panelLocal.Visible = notifiycomb.SelectedItem.ToString() == TipoNotifica.AudioLocale.ToDescriptionString();
-            panelFrasi.Visible = notifiycomb.SelectedItem.ToString() == TipoNotifica.Frase.ToDescriptionString();
+            var selectedType = GetSelectedNotificaType();
+
+            panelLocal.Visible = selectedType == TipoNotifica.AudioLocale;
+            panelFrasi.Visible = selectedType == TipoNotifica.Frase;
         }
 
         private void RiapriDaNascosto(object sender, MouseEventArgs e)
@@ -132,6 +140,13 @@ namespace TimeOutino
                         e.Cancel = true;
                         break;
                 }
+            }
+
+            if (!e.Cancel && notifica != null)
+            {
+                notifica.stop();
+                notifica.Dispose();
+                notifica = null;
             }
         }
     }

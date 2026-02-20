@@ -1,15 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace TimeOutino
 {
     public partial class TimeOutino : Form
     {
-
         CustomTimer customtimer;
         Notifica notifica;
 
@@ -25,59 +22,86 @@ namespace TimeOutino
             }
         }
 
+        private TipoRestart GetSelectedRestartType()
+        {
+            if (restartcomb.SelectedValue is TipoRestart restart)
+                return restart;
+
+            return TipoRestart.Mai;
+        }
+
+        private TipoNotifica GetSelectedNotificaType()
+        {
+            if (notifiycomb.SelectedValue is TipoNotifica tipo)
+                return tipo;
+
+            return TipoNotifica.Generica;
+        }
+
+        private string[] BuildFrasiDataSet()
+        {
+            return txtFrasi.Text
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToArray();
+        }
+
         private Notifica BuildNotifica()
         {
+            var restart = GetSelectedRestartType();
+            var tipo = GetSelectedNotificaType();
+
             try
             {
-                TipoRestart restart = TipoRestart.Mai;
-
-                foreach (TipoRestart tipor in Enum.GetValues(typeof(TipoRestart)))
+                switch (tipo)
                 {
-                    if (restartcomb.SelectedValue.ToString() == tipor.ToDescriptionString())
-                        restart = tipor;
-                }
-
-
-                foreach (TipoNotifica tipo in Enum.GetValues(typeof(TipoNotifica)))
-                {
-                    if (notifiycomb.SelectedValue.ToString() == tipo.ToDescriptionString())
-                        switch (tipo)
+                    case TipoNotifica.Generica:
+                        return new NotificaGenerica()
                         {
-                            case TipoNotifica.Generica:
-                                return new NotificaGenerica()
-                                {
-                                    TipoRestart = restart
-                                };
-                            case TipoNotifica.Frase:
-                                return new NotificaFrase()
-                                {
-                                    DataSet = txtFrasi.Text.Split('\r'),
-                                    TipoRestart = restart
-                                };
-                            case TipoNotifica.AudioLocale:
-                                return new NotificaAudioLocale(AudioLocalePath)
-                                {
-                                    TipoRestart = restart
-                                };
-                        }
+                            TipoRestart = restart
+                        };
+                    case TipoNotifica.Frase:
+                        return new NotificaFrase()
+                        {
+                            DataSet = BuildFrasiDataSet(),
+                            TipoRestart = restart
+                        };
+                    case TipoNotifica.AudioLocale:
+                        return new NotificaAudioLocale(AudioLocalePath)
+                        {
+                            TipoRestart = restart
+                        };
+                    default:
+                        return null;
                 }
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(ex.Message, "Impostazioni non valide", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return null;
             }
-            catch (Exception ee)
+            catch (FileNotFoundException ex)
             {
-
-                MessageBox.Show("Notifica: " + ee.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
-
+                MessageBox.Show("Audio non trovato: " + ex.FileName, "Errore file", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return null;
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(ex.Message, "Errore notifica", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return null;
             }
         }
 
         private void StartNotify()
         {
+            if (notifica == null)
+                return;
+
             notifica.start();
             tabPrincipale.Focus();
             tabTutto.SelectedIndex = 0;
-            if (notifica.TipoRestart == TipoRestart.Snoooze)
+            if (notifica.TipoRestart == TipoRestart.Snooze)
                 btnconfig.BackgroundImage = Properties.Resources.snooze;
             else
                 btnconfig.BackgroundImage = Properties.Resources.OK;

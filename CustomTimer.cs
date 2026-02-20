@@ -12,6 +12,9 @@ namespace TimeOutino
         {
             get
             {
+                if (Starting.TotalSeconds <= 0)
+                    return 0;
+
                 return countdownClock.TotalSeconds / Starting.TotalSeconds * 100;
             }
         }
