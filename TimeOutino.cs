@@ -1,7 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Media;
-using System.Speech.Synthesis;
 using System.Windows.Forms;
 
 namespace TimeOutino
@@ -12,39 +10,38 @@ namespace TimeOutino
         {
             InitializeComponent();
         }
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            customtimer = new CustomTimer();
-            customtimer.InTimeEvent = OnTimeEvent;
-            restartcomb.DataSource = UtilsEnums.TipoRestart_sz;
-            notifiycomb.DataSource = UtilsEnums.TipoNotifica_sz;
 
-            txtFrasi.Text = string.Join("\r\n", NotificaFrase.InitDataSet);
+        private void OnFormLoad(object sender, EventArgs e)
+        {
+            customtimer = new CustomTimer { InTimeEvent = OnTimeEvent };
+            btnconfig.Paint += OnBtnConfigPaint;
+            AbilitaDoubleBuffering(btnconfig);
+
+            BindEnumCombo(restartcomb, Enum.GetValues(typeof(TipoRestart)));
+            BindEnumCombo(notifiycomb, Enum.GetValues(typeof(TipoNotifica)));
+
+            txtFrasi.Text = string.Join(Environment.NewLine, NotificaFrase.InitDataSet);
+
+            ControllaAggiornamenti();
         }
 
         private void RefreshDisplay()
         {
-
             if (customtimer.Running)
             {
-                btnconfig.BackgroundImage = Properties.Resources.Stop;
-                double percentuale = customtimer.Percentage;
-                prgrbr.Value = (int)Math.Round(percentuale);
-
+                SetButtonImage(imgStop);
+                prgrbr.Value = ClampPercentuale(customtimer.Percentage);
                 statuslab.Text = customtimer.ToString();
                 IconaBassa.Text = prgrbr.Value + "%";
-
                 this.Text = "(" + IconaBassa.Text + ") - " + statuslab.Text;
+                btnconfig.Invalidate();
             }
             else
             {
                 if (!NotificaPartita)
                 {
-                    foreach (TabPage tab in tabTutto.TabPages)
-                    {
-                        tab.Enabled = true;
-                    }
-                    btnconfig.BackgroundImage = Properties.Resources.Avvia;
+                    SetTabsEnabled(true);
+                    SetButtonImage(imgAvvia);
                 }
 
                 statuslab.Text = "---";
@@ -56,49 +53,54 @@ namespace TimeOutino
 
         private void ToggleBTNClick(object sender, EventArgs e)
         {
-            bool avvia = true;
+            bool avvia;
             if (customtimer.Running)
             {
-                avvia = false;
                 customtimer.Stop();
+                avvia = false;
             }
             else if (NotificaPartita)
             {
                 avvia = notifica.TipoRestart != TipoRestart.Mai;
-                notifica.stop();
+                notifica.Stop();
             }
             else
             {
                 notifica = BuildNotifica();
-                avvia = (notifica != null);
+                avvia = notifica != null;
             }
+
             if (avvia)
-                SetTimeToClock(TimeSpan.FromMinutes(decimal.ToDouble(nMinutiTot.Value)));
+                SetTimeToClock(TimeSpan.FromMinutes((double)nMinutiTot.Value));
 
             RefreshDisplay();
         }
 
         private void SceglifileEvent(object sender, EventArgs e)
         {
-
-            OpenFileDialog dlg = new OpenFileDialog()
+            using (var dlg = new OpenFileDialog
             {
                 CheckFileExists = true,
                 CheckPathExists = true,
                 Title = "Scegli notifica",
                 Filter = "WAV Files (*.wav)|*.wav|MP3 Files (*.mp3)|*.mp3"
-            };
-            if (dlg.ShowDialog() == DialogResult.OK)
+            })
             {
-                AudioLocalePath = dlg.FileName;
-                txtAudioLocale.Text = Path.GetFileName(dlg.FileName);
+                if (dlg.ShowDialog() == DialogResult.OK)
+                {
+                    AudioLocalePath = dlg.FileName;
+                    txtAudioLocale.Text = Path.GetFileName(dlg.FileName);
+                }
             }
         }
 
         private void CambiaTipoNotifica(object sender, EventArgs e)
         {
-            panelLocal.Visible = notifiycomb.SelectedItem.ToString() == TipoNotifica.AudioLocale.ToDescriptionString();
-            panelFrasi.Visible = notifiycomb.SelectedItem.ToString() == TipoNotifica.Frase.ToDescriptionString();
+            if (notifiycomb.SelectedItem is TipoNotifica tipo)
+            {
+                panelLocal.Visible = tipo == TipoNotifica.AudioLocale;
+                panelFrasi.Visible = tipo == TipoNotifica.Frase;
+            }
         }
 
         private void RiapriDaNascosto(object sender, MouseEventArgs e)
@@ -119,19 +121,23 @@ namespace TimeOutino
 
         private void FormInChiusura(object sender, FormClosingEventArgs e)
         {
-            if (customtimer.Running)
+            if (!customtimer.Running)
+                return;
+
+            DialogResult decisione = MessageBox.Show(
+                "Vuoi mantenere attivo il timer in background?", "Chiudi tutto",
+                MessageBoxButtons.YesNoCancel, MessageBoxIcon.Exclamation);
+
+            switch (decisione)
             {
-                var decisione = MessageBox.Show("Vuoi mantenere attivo il timer in background?", "Chiudi tutto", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Exclamation);
-                switch (decisione)
-                {
-                    case System.Windows.Forms.DialogResult.Yes:
-                        IconaBassa.Visible = true;
-                        this.Hide();
-                        goto case System.Windows.Forms.DialogResult.Cancel;
-                    case System.Windows.Forms.DialogResult.Cancel:
-                        e.Cancel = true;
-                        break;
-                }
+                case DialogResult.Yes:
+                    IconaBassa.Visible = true;
+                    this.Hide();
+                    e.Cancel = true;
+                    break;
+                case DialogResult.Cancel:
+                    e.Cancel = true;
+                    break;
             }
         }
     }

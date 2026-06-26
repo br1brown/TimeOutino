@@ -1,0 +1,13 @@
+# Build .NET
+bin/
+obj/
+publish/
+Releases/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Velopack / output locali
+*.nupkg

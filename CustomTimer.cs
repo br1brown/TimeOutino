@@ -1,72 +1,64 @@
 ﻿using System;
+using System.Windows.Forms;
 
 namespace TimeOutino
 {
+    /// <summary>
+    /// Timer a conto alla rovescia con tick al secondo, basato su <see cref="Timer"/>.
+    /// </summary>
     internal class CustomTimer
     {
-        private System.Windows.Forms.Timer timer;
-        private TimeSpan countdownClock = TimeSpan.Zero;
-        private TimeSpan Starting = TimeSpan.Zero;
+        private readonly Timer timer;
+        private TimeSpan remaining = TimeSpan.Zero;
+        private TimeSpan total = TimeSpan.Zero;
 
-        public double Percentage
-        {
-            get
-            {
-                return countdownClock.TotalSeconds / Starting.TotalSeconds * 100;
-            }
-        }
-
-        public bool Running
-        {
-            get
-            {
-                return timer.Enabled;
-            }
-        }
-
-        public override string ToString()
-        {
-            return countdownClock.ToString(@"hh\:mm\:ss");
-        }
         public CustomTimer()
         {
-            timer = new System.Windows.Forms.Timer();
-            timer.Interval = (int)TimeSpan.FromSeconds(1).TotalMilliseconds;
-            timer.Tick += OnTimeEvent;
+            timer = new Timer
+            {
+                Interval = (int)TimeSpan.FromSeconds(1).TotalMilliseconds
+            };
+            timer.Tick += OnTick;
 
-            InTimeEvent = (d) => { };
+            InTimeEvent = isFinished => { };
         }
 
         /// <summary>
-        /// Bool - is finished
+        /// Invocato a ogni tick; il parametro indica se il conto alla rovescia è arrivato a zero.
         /// </summary>
         public Action<bool> InTimeEvent { get; set; }
 
-        private void OnTimeEvent(object sender, EventArgs e)
-        {
-            countdownClock = countdownClock.Subtract(TimeSpan.FromMilliseconds(timer.Interval));
-            bool ending = countdownClock.TotalMilliseconds <= 0;
+        public bool Running => timer.Enabled;
 
-            if (ending)
-            {
-                countdownClock = TimeSpan.Zero;
-                timer.Stop();
-            }
-            this.InTimeEvent(ending);
+        /// <summary>Percentuale di tempo ancora da scorrere (0-100).</summary>
+        public double Percentage =>
+            total.TotalSeconds <= 0 ? 0 : remaining.TotalSeconds / total.TotalSeconds * 100;
 
-        }
+        public override string ToString() => remaining.ToString(@"hh\:mm\:ss");
 
         public void StartTimer(TimeSpan time)
         {
-            countdownClock = time;
-            Starting = time;
-            
-            if (!Running) timer.Start();
-        }
-        public void Stop()
-        {
-            timer.Stop();
+            remaining = time;
+            total = time;
+
+            if (!Running)
+                timer.Start();
         }
 
+        public void Stop() => timer.Stop();
+
+        private void OnTick(object sender, EventArgs e)
+        {
+            remaining = remaining.Subtract(TimeSpan.FromMilliseconds(timer.Interval));
+            bool finished = remaining.TotalMilliseconds <= 0;
+
+            if (finished)
+            {
+                remaining = TimeSpan.Zero;
+                timer.Stop();
+            }
+
+            InTimeEvent(finished);
+        }
     }
 }

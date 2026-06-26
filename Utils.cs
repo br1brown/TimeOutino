@@ -1,48 +1,36 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Reflection;
 
 namespace TimeOutino
 {
-
     public enum TipoRestart
     {
         [Description("Mai")]
         Mai,
         [Description("dopo 'snooze'")]
-        Snoooze
+        Snooze
     }
 
     internal static class UtilsEnums
     {
-
-        public static string ToDescriptionString(this Enum val)
+        /// <summary>
+        /// Restituisce il testo dell'attributo <see cref="DescriptionAttribute"/> associato
+        /// al valore enum, oppure il nome del valore se l'attributo non è presente.
+        /// </summary>
+        public static string ToDescriptionString(this Enum value)
         {
-            DescriptionAttribute[] attributes = (DescriptionAttribute[])val
-               .GetType()
-               .GetField(val.ToString())
-               .GetCustomAttributes(typeof(DescriptionAttribute), false);
-            return attributes.Length > 0 ? attributes[0].Description : string.Empty;
-        }
+            if (value == null)
+                return string.Empty;
 
-        public static List<string> TipoRestart_sz
-        {
-            get
-            {
-                return Enum.GetValues(typeof(TipoRestart)).Cast<TipoRestart>().Select(r => r.ToDescriptionString()).ToList();
-            }
-        }
+            FieldInfo field = value.GetType().GetField(value.ToString());
+            if (field == null)
+                return value.ToString();
 
-        public static List<string> TipoNotifica_sz
-        {
-            get
-            {
-                return Enum.GetValues(typeof(TipoNotifica)).Cast<TipoNotifica>().Select(r => r.ToDescriptionString()).ToList();
-            }
-        }
+            var attribute = (DescriptionAttribute)Attribute
+                .GetCustomAttribute(field, typeof(DescriptionAttribute));
 
+            return attribute != null ? attribute.Description : value.ToString();
+        }
     }
 }
